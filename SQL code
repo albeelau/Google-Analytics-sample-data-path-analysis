@@ -1,0 +1,50 @@
+1.Most visited pages:
+
+SELECT
+  SUBSTRING(hits.page.pagePath, INSTR(hits.page.pagePath, '/', -1) + 1) AS page,
+  COUNT(hits.page.pagePath) AS number_of_visits
+FROM
+  `bigquery-public-data.google_analytics_sample.ga_sessions_*`, UNNEST(hits) as hits
+WHERE
+  _TABLE_SUFFIX BETWEEN '20160801' AND '20170731'
+GROUP BY page
+ORDER BY number_of_visits DESC
+
+2.Bounce rate for each type of page.
+
+WITH bounce_pageviews AS 
+(SELECT 
+	COUNT(totals.pageviews) AS pageviews, 
+	COUNT(totals.bounces) AS bounces,
+  hits.page.pagePath AS page,
+  ##AVG(totals.timeOnScreen) AS timeOnScreen --There is not any value in "timeOnScreen" column.
+FROM `bigquery-public-data.google_analytics_sample.ga_sessions_*`
+ ,UNNEST(hits) as hits
+WHERE  
+   _table_suffix BETWEEN '20160801'AND '20170730'
+   AND hits.type = 'PAGE'
+GROUP BY page           
+
+SELECT 
+    pageviews, 
+    page,
+    timeOnScreen,
+    IFNULL(((bounces / pageviews)*100),0) AS bounce_rate
+    FROM bounce_pageviews
+GROUP BY pageviews, page, bounces,timeOnScreen
+ORDER BY PAGEVIEWS DESC
+
+3.New users and returning users by countries 
+SELECT 
+	 geoNetwork.country as country,
+	 COUNT(DISTINCT CASE WHEN visitNumber = 1 THEN fullvisitorId END) AS new_users ,
+	 (COUNT(DISTINCT CASE WHEN visitNumber = 1 THEN fullvisitorId END) / COUNT(DISTINCT fullvisitorId)* 100)  AS new_users_rate,
+	 COUNT(DISTINCT CASE WHEN visitNumber > 1 THEN fullvisitorId ELSE NULL END) AS returning_visitors,
+	 (COUNT(DISTINCT CASE WHEN visitNumber > 1 THEN fullvisitorId ELSE NULL END) / COUNT(DISTINCT fullvisitorId)*100) AS return_users_rate 	
+ 
+FROM `bigquery-public-data.google_analytics_sample.ga_sessions_*`
+WHERE  _table_suffix BETWEEN '20160801'AND '20170730'
+GROUP BY country
+ORDER BY country DESC
+
+
