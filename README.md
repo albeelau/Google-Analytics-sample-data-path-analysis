@@ -18,3 +18,4 @@ Here are the screenshots from PowerBI report:
 ![image](https://github.com/albeelau/Google-Analytics-sample-data-path-analysis/assets/77976477/40be2efa-9f4f-4722-8854-c5630f49ab76)
 
 
+Note: There is a technical problem to share Power BI report in Github, please do not hesitate to contact me if you want to get it : albee.lau26@gmail.com
