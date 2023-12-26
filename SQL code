@@ -1,4 +1,4 @@
-#pro-talon-355008.GAsample.ga_actiontype
+-- pro-talon-355008.GAsample.ga_actiontype
 SELECT
     PARSE_DATE('%Y%m%d', date) AS date,
     CONCAT(fullVisitorId, CAST(visitId AS STRING)) AS unique_session_id,
@@ -39,5 +39,216 @@ GROUP BY
 
 
 
+-- pro-talon-355008.GAsample.ga_avgtimeonpage
+select
+  date,
+  country,
+  unique_session_id,
+  pagepath as page,
+  pagetitle as pagetitle,
+  case when pageviews = exits then 0 else total_time_on_page / (pageviews - exits) end as avg_time_on_page
+from (
+  select
+    date,
+    country,
+    fullvisitorid,
+    unique_session_id,
+    pagepath,
+    pagetitle,
+    count(*) as pageviews,
+    countif(isexit is not null) as exits,
+    sum(time_on_page) as total_time_on_page
+  from (
+    select
+      date,
+      country,
+      fullvisitorid,
+      unique_session_id,
+      visitstarttime,
+      pagepath,
+      pagetitle,
+      hit_time,
+      type,
+      isexit,
+      case when isexit is not null then last_interaction - hit_time else next_pageview - hit_time end as time_on_page
+    from (
+      select
+      PARSE_DATE('%Y%m%d', date) AS date,
+      geoNetwork.country AS country,
+        fullvisitorid,
+         CONCAT(fullVisitorId, CAST(visitId AS STRING)) AS unique_session_id,
+        visitstarttime,
+        hits.page.pagepath,
+        hits.page.pagetitle,
+        hits.time / 1000 as hit_time,
+        hits.type,
+        hits.isexit,
+        max(if(hits.isinteraction = true,hits.time / 1000,0)) over (partition by fullvisitorid, visitstarttime) as last_interaction,
+        lead(hits.time / 1000) over (partition by fullvisitorid, visitstarttime order by hits.time / 1000) as next_pageview
+      
+        FROM 
+  `bigquery-public-data.google_analytics_sample.ga_sessions_*`,
+     unnest(hits) as hits
+      
+    WHERE
+      _TABLE_SUFFIX BETWEEN '20160801' AND '20170731'
+        and hits.type = 'PAGE'
+        and totals.visits = 1))   
+  group by
+    1,2,3,4,5,6)
+order by
+  avg_time_on_page desc
 
 
+-- pro-talon-355008.GAsample.ga_bounce_rate
+
+  SELECT
+      PARSE_DATE('%Y%m%d', date) AS date,
+      CONCAT(fullVisitorId, CAST(visitId AS STRING)) AS unique_session_id,
+      geoNetwork.country AS country,
+      trafficSource.medium AS medium,
+      COUNT(hits.page.pagePath) AS total_page_visits,
+      COUNT(DISTINCT CONCAT(fullvisitorid, CAST(visitstarttime AS string))) AS sessions,
+      COUNT(DISTINCT CASE WHEN totals.bounces = 1 THEN CONCAT(fullvisitorid, CAST(visitstarttime AS string)) else null end) AS bounces,
+      COUNT(DISTINCT CASE WHEN totals.bounces = 1 THEN CONCAT(fullvisitorid, CAST(visitstarttime AS string)) else null end) / COUNT(DISTINCT 
+       CONCAT(fullvisitorid, CAST(visitstarttime AS string))) AS bounce_rate,
+      -- average session duration in hours
+      (SUM(totals.timeonsite) / COUNT(DISTINCT CONCAT(fullvisitorid, CAST(visitstarttime AS string)))) / 60 AS average_session_duration
+
+ FROM 
+      `bigquery-public-data.google_analytics_sample.ga_sessions_*`,
+       UNNEST(hits) AS hits
+
+--pro-talon-355008.GAsample.ga_user_analysis
+SELECT
+  PARSE_DATE('%Y%m%d', date) AS date,
+  CONCAT(fullVisitorId, CAST(visitId AS STRING)) AS unique_session_id,
+  geoNetwork.country AS country,
+  trafficSource.medium AS medium,
+  case when totals.newvisits = 1 then 'New visitor' else 'Returning visitor' end as user_type,
+  visitnumber as count_of_sessions,
+  count(distinct fullvisitorid) as users,
+  count(distinct(case when totals.newvisits = 1 then fullvisitorid else null end)) as new_users,
+  (COUNT(DISTINCT CASE WHEN visitNumber = 1 THEN fullvisitorId END) / COUNT(DISTINCT fullvisitorId)* 100)  AS new_users_rate,
+ COUNT(DISTINCT CASE WHEN visitNumber > 1 THEN fullvisitorId ELSE NULL END) AS returning_visitors,
+ (COUNT(DISTINCT CASE WHEN visitNumber > 1 THEN fullvisitorId ELSE NULL END) / COUNT(DISTINCT fullvisitorId)*100) AS return_users_rate, 
+count(distinct(case when totals.newvisits = 1 then fullvisitorid else null end)) / count(distinct concat(fullvisitorid, cast(visitstarttime as string))) as percentage_new_sessions,
+  count(distinct concat(fullvisitorid, cast(visitstarttime as string))) / count(distinct fullvisitorid) as number_of_sessions_per_user,
+  sum((select totals.hits from unnest(hits) group by totals.hits)) as hits
+
+FROM 
+  `bigquery-public-data.google_analytics_sample.ga_sessions_*`
+
+WHERE
+  _TABLE_SUFFIX BETWEEN '20160801' AND '20170731'
+
+GROUP BY
+1,2,3,4,5,6
+ORDER BY 
+4,5
+ 
+
+--pro-talon-355008.GAsample.ga_visited_page
+SELECT
+  PARSE_DATE('%Y%m%d', date) AS date,
+  CONCAT(fullVisitorId, CAST(visitId AS STRING)) AS unique_session_id,
+  geoNetwork.country AS country,
+  device.deviceCategory AS device,
+  trafficSource.medium AS medium,
+  SUBSTRING(hits.page.pagePath, INSTR(hits.page.pagePath, '/', -1) + 1) AS page,
+  COUNT(hits.page.pagePath) AS total_pagevisits
+
+FROM 
+  `bigquery-public-data.google_analytics_sample.ga_sessions_*`,
+   UNNEST(hits) as hits
+
+WHERE
+  _TABLE_SUFFIX BETWEEN '20160801' AND '20170731'
+
+GROUP BY
+1,2,3,4,5,6
+
+-- pro-talon-355008.GAsample.ga_pagepath
+SELECT
+  hostname,
+  page,
+  previous_page,
+  page_path_level_1,
+  page_path_level_2,
+  page_path_level_3,
+  page_path_level_4,
+  page_title,
+  landing_page,
+  second_page,
+  exit_page,
+  -- entrances (metric)
+  countif(isentrance = true) AS entrances,
+  -- pageviews (metric)
+  count(*) AS pageviews,
+  -- pages per session (metric)
+  count(*) / count(distinct concat(fullvisitorid, cASt(visitstarttime AS string))) AS pages_per_session,
+  -- exits (metric)
+  countif(isexit = true) AS exits,
+  -- exit rate (metric)
+  countif(isexit = true) / count(*) AS exit_rate
+FROM(
+  SELECT
+    -- hostname (dimension)
+    hits.page.hostname AS hostname,
+    -- page (dimension)
+    hits.page.pagepath AS page,
+    -- previous page (dimension)
+    lag(hits.page.pagepath, 1) over (partition by fullvisitorid, visitstarttime order by hits.hitnumber ASc) AS previous_page,
+    -- page path level 1 (dimension)
+    hits.page.pagepathlevel1 AS page_path_level_1,
+    -- page path level 2 (dimension)
+    nullif(hits.page.pagepathlevel2,'') AS page_path_level_2,
+    -- page path level 3 (dimension)
+    nullif(hits.page.pagepathlevel3,'') AS page_path_level_3,
+    -- page path level 4 (dimension)
+    nullif(hits.page.pagepathlevel4,'') AS page_path_level_4,
+    -- page title (dimension)
+    hits.page.pagetitle AS page_title,
+    -- landing page (dimension)
+    CASE WHEN hits.isentrance = true then hits.page.pagepath else null end AS landing_page,
+    -- second page (dimension)
+    CASE WHEN hits.isentrance = true then (lead(hits.page.pagepath, 1) over (partition by fullvisitorid, visitstarttime order by hits.hitnumber ASc)) else null end AS second_page,
+    -- exit page (dimension)
+    CASE WHEN hits.isexit = true then hits.page.pagepath else null end AS exit_page,
+    hits.isentrance,
+    fullvisitorid,
+    visitstarttime,
+    hits.isexit
+  
+  FROM 
+  `bigquery-public-data.google_analytics_sample.ga_sessions_*`,
+   UNNEST(hits) AS hits
+
+WHERE
+  _TABLE_SUFFIX BETWEEN '20160801' AND '20170731'
+    AND totals.visits = 1
+    AND hits.type = 'PAGE')
+
+GROUP BY
+  1,2,3,4,5,6,7,8,9,10,11
+
+ORDER BY
+  pageviews DESC
+
+
+-- pro-talon-355008.GAsample.ga_customerpath
+SELECT
+    fullVisitorId,
+    visitId,
+    visitNumber,
+    hits.hitNumber AS hitNumber,
+    hits.page.pagePath AS pagePath
+FROM
+    `bigquery-public-data.google_analytics_sample.ga_sessions_*`,
+UNNEST(hits) as hits
+WHERE
+    _TABLE_SUFFIX BETWEEN '20160801' AND '20170731'
+AND
+    hits.type="PAGE"
+ORDER BY
+1，2，3，4，5
