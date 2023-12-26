@@ -1,50 +1,43 @@
-1.Most visited pages:
-
+#pro-talon-355008.GAsample.ga_actiontype
 SELECT
-  SUBSTRING(hits.page.pagePath, INSTR(hits.page.pagePath, '/', -1) + 1) AS page,
-  COUNT(hits.page.pagePath) AS number_of_visits
-FROM
-  `bigquery-public-data.google_analytics_sample.ga_sessions_*`, UNNEST(hits) as hits
-WHERE
-  _TABLE_SUFFIX BETWEEN '20160801' AND '20170731'
-GROUP BY page
-ORDER BY number_of_visits DESC
+    PARSE_DATE('%Y%m%d', date) AS date,
+    CONCAT(fullVisitorId, CAST(visitId AS STRING)) AS unique_session_id,
+    geoNetwork.country AS country,
+    device.deviceCategory AS device_category,
+    trafficSource.medium,
+    IFNULL(totals.bounces, 0) AS bounce,
+    CAST(hits.eCommerceAction.action_type AS INT64) AS action,
+    CASE hits.eCommerceAction.action_type
+      WHEN '0' THEN 'Visit'
+      WHEN '1' THEN 'Product List'
+      WHEN '2' THEN 'Product Detail Pages'
+      WHEN '3' THEN 'Add to Cart'
+      WHEN '4' THEN 'Remove from Cart'
+      WHEN '5' THEN 'Checkout'
+      WHEN '6' THEN 'Order Complete'
+      WHEN '7' THEN 'Product Refund'
+      WHEN '8' THEN 'Checkout Options'
+    END AS action_type,
+    productsku as product_sku,
+  -- cart-to-detail rate (metric)
+  case when count(case when hits.ecommerceaction.action_type = '2' then fullvisitorid else null end) = 0 then 0 else count(case when hits.ecommerceaction.action_type = '3' 
+  then fullvisitorid else null end) / count(case when hits.ecommerceaction.action_type = '2' then fullvisitorid else null end) end as cart_to_detail_rate,
+  -- buy-to-detail rate (metric)
+  case when count(case when hits.ecommerceaction.action_type = '2' then fullvisitorid else null end) = 0 then 0 else count(case when hits.ecommerceaction.action_type = '6' 
+  then hits.transaction.transactionid else null end) / count(case when hits.ecommerceaction.action_type = '2' then fullvisitorid else null end) end as buy_to_detail_rate
+  
+  FROM
+    `bigquery-public-data.google_analytics_sample.ga_sessions_*`,
+    UNNEST(hits) AS hits,
+    UNNEST(product) AS product
+  
+  WHERE
+    _TABLE_SUFFIX BETWEEN '20160801' AND '20170731'
 
-2.Bounce rate for each type of page.
+GROUP BY
+1,2,3,4,5,6,7,8,9
 
-WITH bounce_pageviews AS 
-(SELECT 
-	COUNT(totals.pageviews) AS pageviews, 
-	COUNT(totals.bounces) AS bounces,
-  hits.page.pagePath AS page,
-  ##AVG(totals.timeOnScreen) AS timeOnScreen --There is not any value in "timeOnScreen" column.
-FROM `bigquery-public-data.google_analytics_sample.ga_sessions_*`
- ,UNNEST(hits) as hits
-WHERE  
-   _table_suffix BETWEEN '20160801'AND '20170730'
-   AND hits.type = 'PAGE'
-GROUP BY page           
 
-SELECT 
-    pageviews, 
-    page,
-    timeOnScreen,
-    IFNULL(((bounces / pageviews)*100),0) AS bounce_rate
-    FROM bounce_pageviews
-GROUP BY pageviews, page, bounces,timeOnScreen
-ORDER BY PAGEVIEWS DESC
 
-3.New users and returning users by countries 
-SELECT 
-	 geoNetwork.country as country,
-	 COUNT(DISTINCT CASE WHEN visitNumber = 1 THEN fullvisitorId END) AS new_users ,
-	 (COUNT(DISTINCT CASE WHEN visitNumber = 1 THEN fullvisitorId END) / COUNT(DISTINCT fullvisitorId)* 100)  AS new_users_rate,
-	 COUNT(DISTINCT CASE WHEN visitNumber > 1 THEN fullvisitorId ELSE NULL END) AS returning_visitors,
-	 (COUNT(DISTINCT CASE WHEN visitNumber > 1 THEN fullvisitorId ELSE NULL END) / COUNT(DISTINCT fullvisitorId)*100) AS return_users_rate 	
- 
-FROM `bigquery-public-data.google_analytics_sample.ga_sessions_*`
-WHERE  _table_suffix BETWEEN '20160801'AND '20170730'
-GROUP BY country
-ORDER BY country DESC
 
 
