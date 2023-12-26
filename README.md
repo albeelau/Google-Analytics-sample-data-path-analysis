@@ -8,6 +8,8 @@ My analytical mindset is finely tuned to dissect customer behavior, identify tre
 
 Join me on this expedition into the digital landscape, where every click, scroll, and interaction tells a story. Let's transform data into actionable insights and elevate the user experience in the world of e-commerce.
 
+Here are the screenshots from PowerBI report:
+
 ![image](https://github.com/albeelau/Google-Analytics-sample-data-path-analysis/assets/77976477/b3207fc7-b61f-4359-8cd1-3e1781a138e4)
 
 ![image](https://github.com/albeelau/Google-Analytics-sample-data-path-analysis/assets/77976477/1b3ff291-71ab-43d4-9023-8c653e3031de)
